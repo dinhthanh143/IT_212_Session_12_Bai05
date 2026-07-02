@@ -1,0 +1,129 @@
+===== BÀI TẬP 05: REFACTOR VÀ HOÀN THIỆN HỆ THỐNG VỚI CLEAN CODE & DESIGN PATTERN =====
+===== FILE 01: PROMPT YÊU CẦU CODE REVIEW & REFACTOR =====
+
+======================================================================
+PROMPT 1: Yêu cầu Code Review - Phân tích Code Smell
+======================================================================
+"Bạn hãy đóng vai một Lead Developer / Code Reviewer có 12 năm kinh nghiệm với Java và Spring Boot.
+
+Tôi cung cấp mã nguồn API Đăng ký eKYC (phiên bản đầu - Bài 3). Hãy review code và chỉ ra:
+
+1. **Code Smells** phát hiện được (liệt kê ít nhất 5 cái)
+2. **Technical Debt** tồn tại
+3. **Vi phạm SOLID Principles** cụ thể (chỉ rõ nguyên tắc nào bị vi phạm)
+4. **Điểm yếu bảo mật** (nếu có)
+5. **Vấn đề về hiệu năng**
+
+Đây là mã nguồn cần review:
+
+```java
+// === RegistrationServiceImpl.java (Code cũ) ===
+@Service
+public class RegistrationServiceImpl implements RegistrationService {
+    
+    @Autowired
+    private RegistrationRepository registrationRepository;
+    
+    public RegistrationResponse register(RegistrationRequest request) {
+        // Kiểm tra dữ liệu
+        if (request.getFullName() == null || request.getFullName().isEmpty()) {
+            throw new RuntimeException("Tên không được để trống");
+        }
+        if (request.getPhone() == null || request.getPhone().isEmpty()) {
+            throw new RuntimeException("SĐT không được để trống");
+        }
+        if (!request.getPhone().matches("^\\d{10}$")) {
+            throw new RuntimeException("SĐT không hợp lệ");
+        }
+        // ... kiểm tra email, citizenId tương tự ...
+        
+        // Kiểm tra trùng
+        Registration existing = registrationRepository.findByCitizenId(request.getCitizenId());
+        if (existing != null) {
+            throw new RuntimeException("CCCD đã tồn tại");
+        }
+        
+        // Lưu
+        Registration registration = new Registration();
+        registration.setFullName(request.getFullName());
+        registration.setPhone(request.getPhone());
+        registration.setEmail(request.getEmail());
+        registration.setCitizenId(request.getCitizenId());
+        registration.setStatus("PENDING");
+        registrationRepository.save(registration);
+        
+        RegistrationResponse response = new RegistrationResponse();
+        response.setRegistrationId(registration.getId());
+        response.setMessage("Thành công");
+        return response;
+    }
+}
+
+// === RegistrationController.java (Code cũ) ===
+@RestController
+public class RegistrationController {
+    
+    @Autowired
+    private RegistrationService registrationService;
+    
+    @PostMapping("/register")
+    public ResponseEntity register(@RequestBody RegistrationRequest request) {
+        try {
+            RegistrationResponse response = registrationService.register(request);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+}
+```
+
+Hãy phân tích chi tiết theo từng mục."
+
+======================================================================
+PROMPT 2: Yêu cầu thực hiện Refactor
+======================================================================
+"Dựa trên các vấn đề đã phát hiện, hãy thực hiện REFACTOR toàn bộ mã nguồn với các cải tiến sau:
+
+1. **Tách lớp Validation**:
+   - Tạo package `validator` riêng
+   - Dùng Bean Validation (@NotBlank, @Email, custom annotation)
+   - Không để logic validation trong Service
+
+2. **Global Exception Handler**:
+   - Tạo class GlobalExceptionHandler với @RestControllerAdvice
+   - Xử lý: MethodArgumentNotValidException, DuplicateResourceException, BusinessException, Exception tổng quát
+   - Tạo ErrorResponse DTO thống nhất (status, error, message, details, timestamp, path)
+   - Tất cả lỗi trả về chuẩn JSON 1 format duy nhất
+
+3. **Service Refactor theo SOLID**:
+   - Single Responsibility: Service chỉ xử lý business logic, không validation
+   - Dependency Injection qua Constructor (thay vì @Autowired field)
+   - Interface rõ ràng
+
+4. **Logging**:
+   - Bổ sung SLF4J Logger tại Controller (bắt đầu/kết thúc request)
+   - Logger tại Service (log thông tin quan trọng, cảnh báo khi lỗi)
+   - Không log dữ liệu nhạy cảm (mask phone, email, citizenId)
+
+5. **DTO**:
+   - Tách biệt Request/Response DTO
+   - Dùng Builder pattern (@Builder)
+
+Hãy viết lại toàn bộ code đã refactor."
+
+======================================================================
+PROMPT 3: Yêu cầu lập bảng báo cáo cải tiến
+======================================================================
+"Hãy lập một bảng tóm tắt so sánh 'Trước Refactor vs Sau Refactor' với các tiêu chí sau:
+
+| Tiêu chí | Trước Refactor | Sau Refactor | Lợi ích |
+|----------|---------------|--------------|---------|
+| Xử lý validation | ... | ... | ... |
+| Xử lý exception | ... | ... | ... |
+| Logging | ... | ... | ... |
+| SOLID compliance | ... | ... | ... |
+| Code structure | ... | ... | ... |
+| Error response | ... | ... | ... |
+
+Giải thích cụ thể từng dòng."
